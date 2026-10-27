@@ -24,9 +24,11 @@
 
 ## The system at a glance
 
-![System architecture](docs/diagrams/architecture.svg)
+![System architecture](docs/diagrams/architecture.png)
 
-A request enters FastAPI, passes the guardrail gate, and is executed by the LangGraph agent inside the same process. Retrieval and reranking run against local models plus the Qdrant Cloud index; synthesis goes out through the Portkey gateway to Groq. An explorable version of this diagram (pan, zoom, dark/light) is in [`.archify/architecture-rag-system-20261028-021934/advanced-rag.architecture.html`](.archify/architecture-rag-system-20261028-021934/advanced-rag.architecture.html).
+<sub>PNG preview · [vector SVG](docs/diagrams/architecture.svg) · [interactive HTML](.archify/architecture-rag-system-20261028-021934/advanced-rag.architecture.html)</sub>
+
+A request enters FastAPI, passes the guardrail gate, and is executed by the LangGraph agent inside the same process. Retrieval and reranking run against local models plus the Qdrant Cloud index; synthesis goes out through the Portkey gateway to Groq. The interactive HTML version supports pan, zoom, route tracing and a dark/light toggle.
 
 ---
 
@@ -44,30 +46,32 @@ A request enters FastAPI, passes the guardrail gate, and is executed by the Lang
 
 ## Request lifecycle
 
-![Request lifecycle](docs/diagrams/request-lifecycle.svg)
+![Request lifecycle](docs/diagrams/request-lifecycle.png)
+
+<sub>PNG preview · [vector SVG](docs/diagrams/request-lifecycle.svg) · [interactive HTML](.archify/sequence-request-lifecycle-20261028-022800/request-lifecycle.sequence.html)</sub>
 
 One `POST /query`, end to end: guardrail gate → planner → hybrid search → RRF fusion → cross-encoder rerank → relevance grading → (optional bounded rewrite) → synthesised answer with sources, plan steps and telemetry.
-
-Explorable HTML: [`.archify/sequence-request-lifecycle-20261028-022800/request-lifecycle.sequence.html`](.archify/sequence-request-lifecycle-20261028-022800/request-lifecycle.sequence.html)
 
 ---
 
 ## The Self-RAG corrective loop
 
-![Self-RAG corrective loop](docs/diagrams/self-rag-loop.svg)
+![Self-RAG corrective loop](docs/diagrams/self-rag-loop.png)
+
+<sub>PNG preview · [vector SVG](docs/diagrams/self-rag-loop.svg) · [interactive HTML](.archify/workflow-self-rag-loop-20261028-022233/self-rag-loop.workflow.html)</sub>
 
 - The **planner** decides between a conversational answer (memory only) and a documentation search at `temperature = 0`.
 - The **grader** reads each retrieved passage against the question and returns the useful indices plus a confidence score.
 - An **irrelevant** verdict routes to the **rewriter**, which produces a new query; `retry_count` bounds the loop at two attempts.
 - A **vector-store outage** takes the short path: no grading, no rewrites, disclosed in the answer — because reformulating a query cannot fix a dead connection.
 
-Explorable HTML: [`.archify/workflow-self-rag-loop-20261028-022233/self-rag-loop.workflow.html`](.archify/workflow-self-rag-loop-20261028-022233/self-rag-loop.workflow.html)
-
 ---
 
 ## Ingestion pipeline
 
-![Ingestion pipeline](docs/diagrams/ingestion-pipeline.svg)
+![Ingestion pipeline](docs/diagrams/ingestion-pipeline.png)
+
+<sub>PNG preview · [vector SVG](docs/diagrams/ingestion-pipeline.svg) · [interactive HTML](.archify/dataflow-ingestion-pipeline-20261028-023107/ingestion-pipeline.dataflow.html)</sub>
 
 Documents are parsed locally (pypdf, BeautifulSoup, python-pptx/docx), split into ~1500-character paragraph chunks, encoded both densely (`all-mpnet-base-v2`) and sparsely (`Qdrant/bm25` via fastembed), and written to Qdrant in one upsert per file. Chunk metadata is also archived to `processed_data/<domain>/` as JSON, so the corpus is inspectable without touching the vector database.
 
@@ -75,8 +79,6 @@ Documents are parsed locally (pypdf, BeautifulSoup, python-pptx/docx), split int
 # wipe + rebuild the hybrid collection from a corpus folder
 python -m app.Ingestion.processor data/true_data --wipe
 ```
-
-Explorable HTML: [`.archify/dataflow-ingestion-pipeline-20261028-023107/ingestion-pipeline.dataflow.html`](.archify/dataflow-ingestion-pipeline-20261028-023107/ingestion-pipeline.dataflow.html)
 
 ---
 
@@ -247,7 +249,7 @@ Deliberately documented rather than hidden:
 
 ## Diagram provenance
 
-Every diagram in this README is generated from a typed JSON specification with the [archify](https://github.com/tt-a1i/archify) skill and passed its validation, delivery, provenance and headless-browser gates — no hand-drawn boxes. Sources and explorable HTML exports are committed under `.archify/`; the SVG assets used above live in `docs/diagrams/`.
+Every diagram in this README is generated from a typed JSON specification with the [archify](https://github.com/tt-a1i/archify) skill and passed its validation, delivery, provenance and headless-browser gates — no hand-drawn boxes. Sources and explorable HTML exports are committed under `.archify/`; the vector SVGs and their 2× PNG previews live in `docs/diagrams/` (the PNGs embedded above are headless-Chrome renders of those SVGs).
 
 | Diagram | Type | Source |
 |---|---|---|
