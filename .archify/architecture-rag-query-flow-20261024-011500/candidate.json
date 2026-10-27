@@ -1,0 +1,374 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Enterprise RAG — Query Lifecycle",
+    "subtitle": "React UI → FastAPI → NeMo guardrails → LangGraph self-correcting retrieval → answer",
+    "output": ".archify/architecture-rag-query-flow-20261024-011500/rag-architecture.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "ui",
+      "type": "frontend",
+      "label": "React Chat UI",
+      "sublabel": "ChatView · Composer",
+      "icon": "frontend",
+      "pos": [
+        300,
+        40
+      ]
+    },
+    {
+      "id": "vite",
+      "type": "frontend",
+      "label": "Vite Dev Server",
+      "sublabel": ":5173 · /api proxy",
+      "pos": [
+        300,
+        150
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "FastAPI Endpoint",
+      "sublabel": "POST /query · GET /graph",
+      "pos": [
+        300,
+        260
+      ]
+    },
+    {
+      "id": "rails",
+      "type": "security",
+      "label": "NeMo Guardrails",
+      "sublabel": "off-topic · jailbreak · dialog",
+      "pos": [
+        300,
+        370
+      ]
+    },
+    {
+      "id": "planner",
+      "type": "backend",
+      "label": "Planner Node",
+      "sublabel": "CONVERSATIONAL or search query",
+      "pos": [
+        300,
+        480
+      ]
+    },
+    {
+      "id": "retriever",
+      "type": "backend",
+      "label": "Retriever Node",
+      "sublabel": "search + rerank → documents",
+      "pos": [
+        300,
+        590
+      ]
+    },
+    {
+      "id": "grader",
+      "type": "backend",
+      "label": "Grader Node",
+      "sublabel": "context relevant / irrelevant",
+      "pos": [
+        300,
+        700
+      ]
+    },
+    {
+      "id": "rewriter",
+      "type": "backend",
+      "label": "Rewriter Node",
+      "sublabel": "retry ≤ MAX_RETRIEVAL_RETRIES",
+      "pos": [
+        40,
+        560
+      ]
+    },
+    {
+      "id": "responder",
+      "type": "backend",
+      "label": "Responder Node",
+      "sublabel": "answer synthesis",
+      "pos": [
+        300,
+        810
+      ]
+    },
+    {
+      "id": "memory",
+      "type": "database",
+      "label": "MemorySaver",
+      "sublabel": "checkpoints per thread_id",
+      "icon": "database",
+      "pos": [
+        40,
+        720
+      ]
+    },
+    {
+      "id": "embed",
+      "type": "backend",
+      "label": "HF Embeddings",
+      "sublabel": "all-mpnet-base-v2 · 768-d",
+      "pos": [
+        745,
+        470
+      ]
+    },
+    {
+      "id": "qdrant",
+      "type": "database",
+      "label": "Qdrant Collection",
+      "sublabel": "rag-v1 · dense + bm25",
+      "icon": "database",
+      "pos": [
+        745,
+        580
+      ]
+    },
+    {
+      "id": "rrf",
+      "type": "backend",
+      "label": "RRF Fusion",
+      "sublabel": "k = 60, rank based",
+      "pos": [
+        745,
+        690
+      ]
+    },
+    {
+      "id": "flash",
+      "type": "backend",
+      "label": "FlashRank Reranker",
+      "sublabel": "ONNX cross-encoder · top 5",
+      "pos": [
+        745,
+        800
+      ]
+    },
+    {
+      "id": "groq",
+      "type": "external",
+      "label": "Groq API",
+      "sublabel": "openai/gpt-oss-20b",
+      "pos": [
+        40,
+        340
+      ],
+      "size": [
+        120,
+        80
+      ]
+    },
+    {
+      "id": "portkey",
+      "type": "cloud",
+      "label": "Portkey Gateway",
+      "sublabel": "fallback · cache · retry",
+      "pos": [
+        40,
+        900
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "LangGraph StateGraph · AgentState",
+      "wraps": [
+        "planner",
+        "retriever",
+        "grader",
+        "rewriter",
+        "responder"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Hybrid retrieval pipeline",
+      "wraps": [
+        "embed",
+        "qdrant",
+        "rrf",
+        "flash"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "ui",
+      "to": "vite",
+      "label": "fetch POST",
+      "variant": "emphasis"
+    },
+    {
+      "from": "vite",
+      "to": "api",
+      "label": "proxy /api"
+    },
+    {
+      "from": "api",
+      "to": "rails",
+      "label": "raw question",
+      "labelDy": 24
+    },
+    {
+      "from": "rails",
+      "to": "api",
+      "label": "rail fired",
+      "variant": "dashed"
+    },
+    {
+      "from": "rails",
+      "to": "planner",
+      "label": "invoke graph"
+    },
+    {
+      "from": "planner",
+      "to": "retriever",
+      "label": "search query"
+    },
+    {
+      "from": "planner",
+      "to": "responder",
+      "label": "CONVERSATIONAL",
+      "variant": "dashed"
+    },
+    {
+      "from": "planner",
+      "to": "groq",
+      "label": "classify intent"
+    },
+    {
+      "from": "retriever",
+      "to": "embed",
+      "label": "embed query"
+    },
+    {
+      "from": "embed",
+      "to": "qdrant",
+      "label": "768-d dense"
+    },
+    {
+      "from": "retriever",
+      "to": "qdrant",
+      "label": "BM25 sparse",
+      "variant": "dashed"
+    },
+    {
+      "from": "qdrant",
+      "to": "rrf",
+      "label": "rank lists"
+    },
+    {
+      "from": "rrf",
+      "to": "flash",
+      "label": "fused top 15"
+    },
+    {
+      "from": "flash",
+      "to": "grader",
+      "label": "top 5 reranked",
+      "variant": "emphasis"
+    },
+    {
+      "from": "grader",
+      "to": "responder",
+      "label": "relevant"
+    },
+    {
+      "from": "grader",
+      "to": "rewriter",
+      "label": "irrelevant"
+    },
+    {
+      "from": "rewriter",
+      "to": "retriever",
+      "label": "rewritten query"
+    },
+    {
+      "from": "responder",
+      "to": "portkey",
+      "label": "chat.completions"
+    },
+    {
+      "from": "portkey",
+      "to": "groq",
+      "label": "fallback"
+    },
+    {
+      "from": "responder",
+      "to": "memory",
+      "label": "append"
+    },
+    {
+      "from": "memory",
+      "to": "planner",
+      "label": "reload history",
+      "variant": "dashed"
+    },
+    {
+      "from": "responder",
+      "to": "ui",
+      "label": "answer + sources",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Query entry",
+      "items": [
+        "useChat posts {q, thread_id} to /api/query; thread_id is the memory key",
+        "FastAPI runs NeMo Rails first — a fired rail returns immediately and never invokes the graph",
+        "Graph runs synchronously so Logfire context is preserved"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Hybrid retrieval",
+      "items": [
+        "Dense kNN (20) and BM25 sparse (20) both run inside Qdrant",
+        "RRF merges by rank position, so incomparable scores never need normalising",
+        "FlashRank cross-encoder trims the fused list to the top 5 passages",
+        "Missing sparse index or reranker failure degrades gracefully, it does not fail the request",
+        "Ingestion (app/Ingestion/processor.py) writes the same dense + BM25 points into rag-v1"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Self-RAG loop",
+      "items": [
+        "Grader returns JSON {relevant: [indices], confidence}",
+        "Empty verdict routes to the rewriter, which caps at MAX_RETRIEVAL_RETRIES (2)",
+        "Malformed grader output fails open so a flaky judge cannot poison a good answer"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "LLM access",
+      "items": [
+        "Planner, grader and rewriter call Groq directly via ChatGroq",
+        "Only the responder goes through Portkey, so it can read x-portkey-cache-status",
+        "Portkey adds fallback, simple cache and 2 retries on 429/503"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Source map (repo paths)",
+      "items": [
+        "UI: frontend/src/App.tsx, hooks/useChat.ts, lib/api.ts, vite.config.ts",
+        "API + guardrails: app/main.py, app/guardrails/rails.py, colang_rules.py",
+        "Graph: app/agents/graph.py, state.py, nodes/{planner,retriever,grader,rewriter,responder}.py",
+        "Retrieval: app/services/Retrieval/{qdrant_service,embeddings,fusion,ranking_service,schema}.py",
+        "LLM + storage: app/gateway/client.py, app/config.py",
+        "Ingestion: app/Ingestion/processor.py"
+      ]
+    }
+  ]
+}

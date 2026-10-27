@@ -1,0 +1,262 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Self-RAG Corrective Loop — Agent Workflow",
+    "subtitle": "One question through the LangGraph agent: plan, retrieve, grade, rewrite when needed, answer",
+    "output": ".archify/workflow-self-rag-loop-20261028-022233/self-rag-loop.workflow.html",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    {
+      "id": "client",
+      "label": "Client"
+    },
+    {
+      "id": "api",
+      "label": "FastAPI + guardrails"
+    },
+    {
+      "id": "agent",
+      "label": "LangGraph agent"
+    },
+    {
+      "id": "retrieval",
+      "label": "Retrieval & local models"
+    }
+  ],
+  "phases": [
+    {
+      "id": "intake",
+      "label": "Intake",
+      "fromCol": 0,
+      "toCol": 0
+    },
+    {
+      "id": "evidence",
+      "label": "Retrieve + grade",
+      "fromCol": 1,
+      "toCol": 3,
+      "variant": "emphasis"
+    },
+    {
+      "id": "resolve",
+      "label": "Rewrite or answer",
+      "fromCol": 4,
+      "toCol": 5,
+      "variant": "dashed"
+    }
+  ],
+  "groups": [
+    {
+      "id": "corrective_loop",
+      "label": "Self-RAG corrective loop",
+      "lane": "agent",
+      "fromCol": 3,
+      "toCol": 4,
+      "variant": "emphasis"
+    }
+  ],
+  "mainPath": [
+    "browser",
+    "guard",
+    "planner",
+    "hybrid",
+    "grader",
+    "responder",
+    "response",
+    "rendered"
+  ],
+  "nodes": [
+    {
+      "id": "browser",
+      "lane": "client",
+      "col": 0,
+      "type": "external",
+      "label": "Browser",
+      "sublabel": "POST /query",
+      "width": 175
+    },
+    {
+      "id": "rendered",
+      "lane": "client",
+      "col": 5,
+      "type": "frontend",
+      "label": "Answer rendered",
+      "sublabel": "markdown · sources · telemetry",
+      "width": 255
+    },
+    {
+      "id": "guard",
+      "lane": "api",
+      "col": 0,
+      "type": "security",
+      "label": "NeMo Guardrails",
+      "sublabel": "off-topic · jailbreak",
+      "tag": "gate before retrieval",
+      "width": 175
+    },
+    {
+      "id": "response",
+      "lane": "api",
+      "col": 5,
+      "type": "backend",
+      "label": "API response",
+      "sublabel": "answer, sources, grade",
+      "width": 205
+    },
+    {
+      "id": "planner",
+      "lane": "agent",
+      "col": 1,
+      "type": "backend",
+      "label": "Planner",
+      "sublabel": "conversational or search",
+      "tag": "temperature 0",
+      "width": 165
+    },
+    {
+      "id": "grader",
+      "lane": "agent",
+      "col": 3,
+      "type": "backend",
+      "label": "Grader",
+      "sublabel": "are these passages useful?",
+      "tag": "relevance gate",
+      "width": 175
+    },
+    {
+      "id": "rewriter",
+      "lane": "agent",
+      "col": 4,
+      "type": "backend",
+      "label": "Rewriter",
+      "sublabel": "new keywords, retry",
+      "tag": "max 2 rewrites",
+      "width": 165
+    },
+    {
+      "id": "responder",
+      "lane": "agent",
+      "col": 5,
+      "type": "backend",
+      "label": "Responder",
+      "sublabel": "synthesise from context",
+      "width": 205
+    },
+    {
+      "id": "hybrid",
+      "lane": "retrieval",
+      "col": 2,
+      "type": "database",
+      "label": "Qdrant hybrid retrieval",
+      "sublabel": "dense + BM25 → RRF → rerank",
+      "tag": "top 5 chunks",
+      "width": 190
+    }
+  ],
+  "edges": [
+    {
+      "id": "ask",
+      "from": "browser",
+      "to": "guard",
+      "label": "question",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "allow",
+      "from": "guard",
+      "to": "planner",
+      "label": "allowed",
+      "variant": "default",
+      "role": "main"
+    },
+    {
+      "id": "plan-search",
+      "from": "planner",
+      "to": "hybrid",
+      "label": "refined search query",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "chunks",
+      "from": "hybrid",
+      "to": "grader",
+      "label": "top 5 chunks",
+      "variant": "default",
+      "role": "main"
+    },
+    {
+      "id": "grade-good",
+      "from": "grader",
+      "to": "responder",
+      "label": "relevant",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "grade-bad",
+      "from": "grader",
+      "to": "rewriter",
+      "label": "irrelevant",
+      "variant": "security",
+      "role": "branch"
+    },
+    {
+      "id": "retry",
+      "from": "rewriter",
+      "to": "hybrid",
+      "label": "rewritten query (retry ≤ 2)",
+      "variant": "dashed",
+      "role": "return",
+      "route": "up-channel"
+    },
+    {
+      "id": "answer",
+      "from": "responder",
+      "to": "response",
+      "label": "grounded answer",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "deliver",
+      "from": "response",
+      "to": "rendered",
+      "label": "JSON + telemetry",
+      "variant": "default",
+      "role": "return"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "How the loop stays corrective",
+      "items": [
+        "The grader reads each retrieved passage against the question and returns only the useful ones with a confidence score",
+        "An irrelevant verdict routes to the rewriter, which reformulates the query and re-runs retrieval from scratch",
+        "retry_count is bounded by MAX_RETRIEVAL_RETRIES (2), so the loop always terminates and the last context is still used",
+        "Off-topic and jailbreak input is refused by the guardrail before any planner or retrieval work happens"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Two shortcuts that skip work",
+      "items": [
+        "Greetings and memory-only questions are answered from conversation history without touching the vector store (planner → responder)",
+        "A vector-DB outage is disclosed to the user and skips rewriting entirely, because a new query cannot fix a dead socket",
+        "An empty-but-healthy index is reported as no context found, so the two failures never look alike"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "What the user sees per answer",
+      "items": [
+        "Grader verdict chip (context verified or low relevance) with confidence percentage",
+        "Rewrite count, end-to-end latency, the agent's plan steps and every retrieved chunk with its source document"
+      ]
+    }
+  ]
+}

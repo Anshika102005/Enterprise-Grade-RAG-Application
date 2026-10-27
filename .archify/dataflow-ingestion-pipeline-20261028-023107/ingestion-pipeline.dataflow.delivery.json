@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "896d3edc-5315-431d-a43c-37b87edf9a5d",
+  "status": "current",
+  "command": "deliver",
+  "type": "dataflow",
+  "input": "D:\\Projects\\Advanced_RAG\\.archify\\dataflow-ingestion-pipeline-20261028-023107\\candidate.json",
+  "output": "D:\\Projects\\Advanced_RAG\\.archify\\dataflow-ingestion-pipeline-20261028-023107\\ingestion-pipeline.dataflow.html",
+  "specification": {
+    "sha256": "86a3729bf908c0807f9fa168c682a9177f8c8d8ee5707638f5066dd116f5c6d2",
+    "bytes": 4400
+  },
+  "artifact": {
+    "sha256": "a472becb48689a5621497d36bf6d2d78389880b3afe9cbf9cc1d1aebc66acc4f",
+    "bytes": 753273
+  }
+}

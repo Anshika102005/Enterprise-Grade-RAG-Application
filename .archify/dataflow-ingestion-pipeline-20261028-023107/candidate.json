@@ -1,0 +1,160 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Ingestion Pipeline — Corpus to Hybrid Index",
+    "subtitle": "How documents become searchable points, and what the agent finally consumes",
+    "output": ".archify/dataflow-ingestion-pipeline-20261028-023107/ingestion-pipeline.dataflow.html",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1080,
+      420
+    ]
+  },
+  "stages": [
+    {
+      "label": "Corpus"
+    },
+    {
+      "label": "Parse + chunk"
+    },
+    {
+      "label": "Encode"
+    },
+    {
+      "label": "Index"
+    },
+    {
+      "label": "Serve"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "corpus",
+      "type": "external",
+      "label": "Domain corpus",
+      "sublabel": "611 md · 57 pdf",
+      "stage": 0,
+      "row": 0,
+      "width": 130
+    },
+    {
+      "id": "ingest",
+      "type": "backend",
+      "label": "Loader + chunker",
+      "sublabel": "pypdf · bs4 · 1500 chars",
+      "stage": 1,
+      "row": 0,
+      "width": 140
+    },
+    {
+      "id": "encoders",
+      "type": "backend",
+      "label": "Encoders",
+      "sublabel": "mpnet 768-d + BM25",
+      "stage": 2,
+      "row": 0,
+      "width": 140
+    },
+    {
+      "id": "qdrant",
+      "type": "database",
+      "label": "Qdrant collection",
+      "sublabel": "rag-v1 hybrid index",
+      "stage": 3,
+      "row": 0,
+      "width": 140
+    },
+    {
+      "id": "retrieval",
+      "type": "backend",
+      "label": "Hybrid retrieval",
+      "sublabel": "RRF + rerank top 5",
+      "stage": 4,
+      "row": 0,
+      "width": 125
+    },
+    {
+      "id": "agent",
+      "type": "backend",
+      "label": "LangGraph agent",
+      "sublabel": "answers + sources",
+      "stage": 4,
+      "row": 1,
+      "width": 125
+    }
+  ],
+  "flows": [
+    {
+      "id": "corpus-ingest",
+      "from": "corpus",
+      "to": "ingest",
+      "label": "corpus",
+      "classification": "611 md + 57 pdf",
+      "variant": "emphasis",
+      "labelDy": -44
+    },
+    {
+      "id": "ingest-encoders",
+      "from": "ingest",
+      "to": "encoders",
+      "label": "chunk text",
+      "classification": "text/plain",
+      "variant": "emphasis"
+    },
+    {
+      "id": "encoders-qdrant",
+      "from": "encoders",
+      "to": "qdrant",
+      "label": "vectors",
+      "classification": "768-d + BM25",
+      "variant": "emphasis"
+    },
+    {
+      "id": "qdrant-retrieval",
+      "from": "qdrant",
+      "to": "retrieval",
+      "label": "20 + 20",
+      "classification": "scored points",
+      "variant": "emphasis"
+    },
+    {
+      "id": "retrieval-agent",
+      "from": "retrieval",
+      "to": "agent",
+      "label": "chunks",
+      "classification": "text + source",
+      "variant": "emphasis",
+      "labelDy": -72
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "What the corpus contains",
+      "items": [
+        "611 generated markdown documents across 13 technical domains: databases, DSA, RAG, agentic AI, machine learning, deep learning, MLOps, Kubernetes, Python APIs, frontend and backend",
+        "57 reference PDFs and 30 Python API documents make the corpus realistic rather than uniformly on-topic",
+        "674 distinct source documents and 1174 indexed points in the live rag-v1 collection"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Why both vectors are written",
+      "items": [
+        "Every point carries a 768-d dense vector and a BM25 sparse vector in the same upsert, so one query can score both ways",
+        "Dense vectors catch paraphrase and intent; BM25 catches exact identifiers, acronyms and error strings",
+        "Retrieval fuses the two rankings with Reciprocal Rank Fusion before the cross-encoder reranks"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Operational behaviour",
+      "items": [
+        "Run per folder: python -m app.Ingestion.processor <dir> <source_type>; each chunk's metadata is also written to processed_data/<domain>/ as JSON",
+        "Ingestion is not idempotent — re-running a folder without --wipe duplicates its chunks, so a wipe rebuilds cleanly",
+        "A preflight loads the BM25 model first, so a broken Hugging Face environment fails loudly before touching Qdrant"
+      ]
+    }
+  ]
+}

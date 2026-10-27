@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "b82bfc86-331c-4435-afee-5046d644b0d3",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "D:\\Projects\\Advanced_RAG\\.archify\\architecture-rag-query-flow-20261024-011500\\candidate.json",
+  "output": "D:\\Projects\\Advanced_RAG\\.archify\\architecture-rag-query-flow-20261024-011500\\rag-architecture.html",
+  "specification": {
+    "sha256": "5f436ed8d7b743d2032b41ba51bad2673306d5685f891df28e6fe5df10ad0f0d",
+    "bytes": 8231
+  },
+  "artifact": {
+    "sha256": "a66af695badb137d06513d1c43478cb47a196462bbc0e080d24b196935689ead",
+    "bytes": 787018
+  }
+}

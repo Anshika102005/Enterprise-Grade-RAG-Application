@@ -1,0 +1,283 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Request Lifecycle — POST /query",
+    "subtitle": "Every hop behind one answer: guardrails, planning, hybrid retrieval, grading, synthesis",
+    "output": ".archify/sequence-request-lifecycle-20261028-022800/request-lifecycle.sequence.html",
+    "viewBox": [
+      1080,
+      690
+    ],
+    "column_fit": "spread",
+    "quality_profile": "showcase"
+  },
+  "participants": [
+    {
+      "id": "browser",
+      "type": "external",
+      "label": "React UI",
+      "sublabel": "browser session"
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "FastAPI",
+      "sublabel": "/query + CORS"
+    },
+    {
+      "id": "rails",
+      "type": "security",
+      "label": "NeMo Guardrails",
+      "sublabel": "input rails"
+    },
+    {
+      "id": "agent",
+      "type": "backend",
+      "label": "LangGraph agent",
+      "sublabel": "5-node state machine"
+    },
+    {
+      "id": "qdrant",
+      "type": "database",
+      "label": "Qdrant Cloud",
+      "sublabel": "rag-v1 hybrid"
+    },
+    {
+      "id": "gateway",
+      "type": "cloud",
+      "label": "Portkey",
+      "sublabel": "cache · retry · fallback"
+    },
+    {
+      "id": "groq",
+      "type": "cloud",
+      "label": "Groq LLM",
+      "sublabel": "gpt-oss-20b"
+    }
+  ],
+  "segments": [
+    {
+      "from": 160,
+      "to": 315,
+      "label": "Gate + plan"
+    },
+    {
+      "from": 318,
+      "to": 465,
+      "label": "Retrieve + grade + retry"
+    },
+    {
+      "from": 468,
+      "to": 570,
+      "label": "Synthesise + respond"
+    }
+  ],
+  "messages": [
+    {
+      "id": "ask",
+      "from": "browser",
+      "to": "api",
+      "y": 168,
+      "label": "POST /query {q, thread_id}",
+      "variant": "emphasis"
+    },
+    {
+      "id": "guard",
+      "from": "api",
+      "to": "rails",
+      "y": 196,
+      "label": "guard(question)",
+      "variant": "security"
+    },
+    {
+      "id": "allowed",
+      "from": "rails",
+      "to": "api",
+      "y": 224,
+      "label": "allowed",
+      "variant": "return"
+    },
+    {
+      "id": "invoke",
+      "from": "api",
+      "to": "agent",
+      "y": 252,
+      "label": "rag_agent.invoke(state)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "plan",
+      "from": "agent",
+      "to": "groq",
+      "y": 280,
+      "label": "planner: conversational or search?",
+      "variant": "default"
+    },
+    {
+      "id": "plan-back",
+      "from": "groq",
+      "to": "agent",
+      "y": 308,
+      "label": "search query",
+      "variant": "return"
+    },
+    {
+      "id": "search",
+      "from": "agent",
+      "to": "qdrant",
+      "y": 336,
+      "label": "hybrid search: dense + BM25 → RRF",
+      "variant": "emphasis"
+    },
+    {
+      "id": "search-back",
+      "from": "qdrant",
+      "to": "agent",
+      "y": 364,
+      "label": "15 candidates, reranked to 5",
+      "variant": "return"
+    },
+    {
+      "id": "grade",
+      "from": "agent",
+      "to": "groq",
+      "y": 392,
+      "label": "grader: which passages are useful?",
+      "variant": "default"
+    },
+    {
+      "id": "grade-back",
+      "from": "groq",
+      "to": "agent",
+      "y": 420,
+      "label": "relevant indices + confidence",
+      "variant": "return"
+    },
+    {
+      "id": "rewrite",
+      "from": "agent",
+      "to": "groq",
+      "y": 448,
+      "label": "rewriter: reformulate the query",
+      "variant": "dashed",
+      "note": "only if irrelevant · retry ≤ 2, then re-runs retrieval"
+    },
+    {
+      "id": "synthesise",
+      "from": "agent",
+      "to": "gateway",
+      "y": 476,
+      "label": "synthesise (Portkey → Groq)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "answer",
+      "from": "gateway",
+      "to": "agent",
+      "y": 504,
+      "label": "grounded answer",
+      "variant": "return"
+    },
+    {
+      "id": "final-state",
+      "from": "agent",
+      "to": "api",
+      "y": 532,
+      "label": "answer, sources, plan, grade, confidence",
+      "variant": "return"
+    },
+    {
+      "id": "respond",
+      "from": "api",
+      "to": "browser",
+      "y": 560,
+      "label": "200 JSON",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "browser",
+      "from": 163,
+      "to": 566,
+      "type": "external"
+    },
+    {
+      "participant": "api",
+      "from": 168,
+      "to": 538,
+      "type": "backend"
+    },
+    {
+      "participant": "rails",
+      "from": 193,
+      "to": 230,
+      "type": "security"
+    },
+    {
+      "participant": "agent",
+      "from": 252,
+      "to": 540,
+      "type": "backend"
+    },
+    {
+      "participant": "qdrant",
+      "from": 330,
+      "to": 370,
+      "type": "database"
+    },
+    {
+      "participant": "gateway",
+      "from": 471,
+      "to": 510,
+      "type": "cloud"
+    },
+    {
+      "participant": "groq",
+      "from": 275,
+      "to": 313,
+      "type": "cloud"
+    },
+    {
+      "participant": "groq",
+      "from": 387,
+      "to": 425,
+      "type": "cloud"
+    },
+    {
+      "participant": "groq",
+      "from": 443,
+      "to": 458,
+      "type": "cloud"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Cheap steps first",
+      "items": [
+        "Guardrails, planner, grader and rewriter all use the fast gpt-oss-20b model at temperature 0",
+        "Retrieval is bounded at 20 dense + 20 sparse candidates, fused to 15 and reranked to 5 before any synthesis"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Where the quality comes from",
+      "items": [
+        "Hybrid dense + BM25 search is fused with Reciprocal Rank Fusion, so semantic and keyword matches both survive",
+        "A local FlashRank cross-encoder re-scores the fused list before the grader judges usefulness",
+        "Synthesis only ever sees passages the grader accepted"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "When retrieval fails",
+      "items": [
+        "An unreachable vector DB raises RetrievalUnavailableError instead of returning an empty list",
+        "Grading and rewriting are skipped, and the answer states that retrieval was unavailable",
+        "The API exposes retrieval_error so the UI shows 'Retrieval unavailable' rather than '0% confidence'"
+      ]
+    }
+  ]
+}

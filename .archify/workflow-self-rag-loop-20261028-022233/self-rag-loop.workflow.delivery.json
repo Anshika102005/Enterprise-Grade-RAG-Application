@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "6b8c8082-238f-4e2f-9819-e55d14935d2c",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "D:\\Projects\\Advanced_RAG\\.archify\\workflow-self-rag-loop-20261028-022233\\candidate.json",
+  "output": "D:\\Projects\\Advanced_RAG\\.archify\\workflow-self-rag-loop-20261028-022233\\self-rag-loop.workflow.html",
+  "specification": {
+    "sha256": "a6496ebf6528e203b7d7796285be0db8c757d3e4dc232109c47cb16368a4c58b",
+    "bytes": 6557
+  },
+  "artifact": {
+    "sha256": "ec3e94743ebf4f866b37407793980c686469184a6b8ba7db103e3aa544d9efb4",
+    "bytes": 763561
+  }
+}

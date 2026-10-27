@@ -1,0 +1,156 @@
+# ============================================
+# ADVANCED RAG - .gitignore
+# Prevents confidential data from being committed to GitHub
+# ============================================
+
+# -----------------------------------------------
+# SECRETS & CREDENTIALS (Most Critical)
+# -----------------------------------------------
+.env
+.env.local
+.env.production
+.env.dev
+.env.test
+.env.*.local
+*.env.*
+
+# OAuth / API credentials
+credentials.json
+serviceAccountKey.json
+service-account.json
+account_key.json
+
+# Private keys & certificates
+*.pem
+*.key
+*.p12
+*.pfx
+*.p8
+authorized_keys
+ssh_config
+
+# Cloud credentials
+google-cloud.json
+gcp_credentials.json
+aws_credentials
+aws-secret-key
+
+# Token files
+*.token
+*.auth
+.htpasswd
+
+# -----------------------------------------------
+# Python Virtual Environments
+# -----------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+virtualenv/
+ENV/
+.venv-bk/
+
+# -----------------------------------------------
+# Python Cache Files
+# -----------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.installed.cfg
+*.egg
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.eggs/
+MANIFEST
+
+# -----------------------------------------------
+# Test & Coverage Artifacts
+# -----------------------------------------------
+.pytest_cache/
+.coverage
+coverage.xml
+*.cover
+.hypothesis/
+.reportlab/
+.reports/
+htmlcov/
+.tox/
+.venv-tmp/
+
+# -----------------------------------------------
+# Data Directories (may contain sensitive data)
+# -----------------------------------------------
+data/
+processed_data/
+noisy_data/
+true_data/
+python_backend_apis/
+text_files/
+*.jsonl
+*.csv
+*.xlsx
+*.parquet
+
+# -----------------------------------------------
+# Frontend
+# -----------------------------------------------
+frontend/node_modules/
+frontend/.output/
+frontend/dist/
+frontend/.cache/
+
+# -----------------------------------------------
+# Logs & Runtime
+# -----------------------------------------------
+*.log
+logs/
+reportlab/
+
+# -----------------------------------------------
+# Editor & OS Generated Files
+# -----------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# -----------------------------------------------
+# Jupyter Notebooks
+# -----------------------------------------------
+*.ipynb_checkpoints
+
+# -----------------------------------------------
+# OS-Specific
+# -----------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# -----------------------------------------------
+# Langfuse / LangSmith Local Data
+# -----------------------------------------------
+langfuse/
+langsmith/
+.persistent/
