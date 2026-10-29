@@ -1,8 +1,0 @@
-{
-  "schemaVersion": 1,
-  "command": "deliver",
-  "status": "pending",
-  "receiptId": "4a3cc730-0df0-48da-98f3-f6e9e8b3b4c4",
-  "input": "D:\\Projects\\Advanced_RAG\\.archify\\workflow-self-rag-loop-20261028-022233\\candidate.json",
-  "output": "D:\\Projects\\Advanced_RAG\\.archify\\workflow-self-rag-loop-20261028-022233\\self-rag-loop.workflow-return-left.html"
-}

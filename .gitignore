@@ -154,3 +154,15 @@ Thumbs.db
 langfuse/
 langsmith/
 .persistent/
+
+# -----------------------------------------------
+# Archify (generated architecture artifacts)
+# -----------------------------------------------
+.archify/
+
+# -----------------------------------------------
+# Scratch / Development Files
+# -----------------------------------------------
+_*
+_cmp/
+_receipts/
