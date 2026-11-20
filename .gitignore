@@ -160,13 +160,13 @@ langsmith/
 # -----------------------------------------------
 .archify/
 
-# Export scripts are committed for reproducibility
-!_export_diagrams.py
-!_export_svg.py
-
 # -----------------------------------------------
 # Scratch / Development Files
 # -----------------------------------------------
 _*
 _cmp/
 _receipts/
+
+# Export scripts are committed for reproducibility (must come after _* pattern)
+!_export_diagrams.py
+!_export_svg.py
