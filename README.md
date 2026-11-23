@@ -11,6 +11,38 @@
   <img alt="Tests" src="https://img.shields.io/badge/pytest-16%20passing-0A9EDC?style=flat">
 </p>
 
+---
+
+## Table of contents
+
+- [About](#about)
+- [System architecture](#system-architecture)
+- [Request lifecycle](#request-lifecycle)
+- [The Self-RAG corrective loop](#the-self-rag-corrective-loop)
+- [Ingestion pipeline](#ingestion-pipeline)
+- [Why this is more than a vector-search wrapper](#why-this-is-more-than-a-vector-search-wrapper)
+- [Quick start](#quick-start)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [API](#api)
+- [Retrieval parameters](#retrieval-parameters)
+- [Stack](#stack)
+- [Evaluation & CI](#evaluation--ci)
+- [Repository layout](#repository-layout)
+- [Diagram generation](#diagram-generation)
+- [Known limitations](#known-limitations)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [FAQ](#faq)
+- [Credits](#credits)
+- [License](#license)
+
+---
+
+## About
+
+Advanced RAG answers questions over a 674-document technical corpus (13 domains) and shows its work: the plan it followed, the passages it retrieved, the grade it gave its own context, and the number of rewrites it needed. It exists to demonstrate the parts that separate a working RAG product from a vector-store demo — hybrid retrieval, reranking, self-correction, guardrails, provider failover, and measured quality.
+
 | | |
 |---|---|
 | **Answer pipeline** | planner → retriever → grader → rewriter → responder (LangGraph, checkpointed per `thread_id`) |
@@ -22,13 +54,59 @@
 
 ---
 
-## The system at a glance
+## System architecture
 
-![System architecture](docs/diagrams/architecture.png)
+<p align="center">
+  <img src="docs/diagrams/architecture.png" alt="Advanced RAG system architecture: React UI to FastAPI, NeMo Guardrails, LangGraph agent, hybrid retrieval, Qdrant and Groq" width="100%">
+</p>
 
-<sub>PNG preview · [vector SVG](docs/diagrams/architecture.svg) · [interactive HTML](.archify/architecture-rag-system-20261028-021934/advanced-rag.architecture.html)</sub>
+<sub>PNG preview · [vector SVG](docs/diagrams/architecture.svg)</sub>
 
-A request enters FastAPI, passes the guardrail gate, and is executed by the LangGraph agent inside the same process. Retrieval and reranking run against local models plus the Qdrant Cloud index; synthesis goes out through the Portkey gateway to Groq. The interactive HTML version supports pan, zoom, route tracing and a dark/light toggle.
+A request enters FastAPI, passes the guardrail gate, and is executed by the LangGraph agent inside the same process. Retrieval and reranking run against local models plus the Qdrant Cloud index; synthesis goes out through the Portkey gateway to Groq.
+
+---
+
+## Request lifecycle
+
+<p align="center">
+  <img src="docs/diagrams/request-lifecycle.png" alt="Sequence diagram of one POST /query: guardrails, planner, hybrid search, RRF, rerank, grading, rewrite and synthesis" width="100%">
+</p>
+
+<sub>PNG preview · [vector SVG](docs/diagrams/request-lifecycle.svg)</sub>
+
+One `POST /query`, end to end: guardrail gate → planner → hybrid search → RRF fusion → cross-encoder rerank → relevance grading → (optional bounded rewrite) → synthesised answer with sources, plan steps and telemetry.
+
+---
+
+## The Self-RAG corrective loop
+
+<p align="center">
+  <img src="docs/diagrams/self-rag-loop.png" alt="Self-RAG workflow: planner decides answer vs search, grader verifies context, rewriter retries at most twice" width="100%">
+</p>
+
+<sub>PNG preview · [vector SVG](docs/diagrams/self-rag-loop.svg)</sub>
+
+- The **planner** decides between a conversational answer (memory only) and a documentation search at `temperature = 0`.
+- The **grader** reads each retrieved passage against the question and returns the useful indices plus a confidence score.
+- An **irrelevant** verdict routes to the **rewriter**, which produces a new query; `retry_count` bounds the loop at two attempts.
+- A **vector-store outage** takes the short path: no grading, no rewrites, disclosed in the answer — because reformulating a query cannot fix a dead connection.
+
+---
+
+## Ingestion pipeline
+
+<p align="center">
+  <img src="docs/diagrams/ingestion-pipeline.png" alt="Ingestion pipeline: loaders, 1500-character chunker, dense and sparse encoders, Qdrant upsert" width="100%">
+</p>
+
+<sub>PNG preview · [vector SVG](docs/diagrams/ingestion-pipeline.svg)</sub>
+
+Documents are parsed locally (pypdf, BeautifulSoup, python-pptx/docx), split into ~1500-character paragraph chunks, encoded both densely (`all-mpnet-base-v2`) and sparsely (`Qdrant/bm25` via fastembed), and written to Qdrant in one upsert per file. Chunk metadata is also archived to `processed_data/<domain>/` as JSON, so the corpus is inspectable without touching the vector database.
+
+```bash
+# wipe + rebuild the hybrid collection from a corpus folder
+python -m app.Ingestion.processor data/true_data --wipe
+```
 
 ---
 
@@ -42,42 +120,132 @@ A request enters FastAPI, passes the guardrail gate, and is executed by the Lang
 - **Failures are reported honestly.** An unreachable vector store raises `RetrievalUnavailableError` instead of quietly returning zero results: grading and rewriting are skipped, the answer discloses that retrieval failed, and the UI shows *"Retrieval unavailable"* rather than blaming the query with *"0% confidence"*.
 - **Quality is measured, not assumed.** RAGAS and DeepEval score faithfulness, relevancy, context precision/recall, hallucination and scope adherence; breaching a threshold in `evals/thresholds.py` fails the build.
 
----
+### Features
 
-## Request lifecycle
-
-![Request lifecycle](docs/diagrams/request-lifecycle.png)
-
-<sub>PNG preview · [vector SVG](docs/diagrams/request-lifecycle.svg) · [interactive HTML](.archify/sequence-request-lifecycle-20261028-022800/request-lifecycle.sequence.html)</sub>
-
-One `POST /query`, end to end: guardrail gate → planner → hybrid search → RRF fusion → cross-encoder rerank → relevance grading → (optional bounded rewrite) → synthesised answer with sources, plan steps and telemetry.
-
----
-
-## The Self-RAG corrective loop
-
-![Self-RAG corrective loop](docs/diagrams/self-rag-loop.png)
-
-<sub>PNG preview · [vector SVG](docs/diagrams/self-rag-loop.svg) · [interactive HTML](.archify/workflow-self-rag-loop-20261028-022233/self-rag-loop.workflow.html)</sub>
-
-- The **planner** decides between a conversational answer (memory only) and a documentation search at `temperature = 0`.
-- The **grader** reads each retrieved passage against the question and returns the useful indices plus a confidence score.
-- An **irrelevant** verdict routes to the **rewriter**, which produces a new query; `retry_count` bounds the loop at two attempts.
-- A **vector-store outage** takes the short path: no grading, no rewrites, disclosed in the answer — because reformulating a query cannot fix a dead connection.
+- ✨ **Five-node agent graph** — planner, retriever, grader, rewriter and responder, checkpointed per conversation thread.
+- 🔍 **Hybrid search + rerank** — dense embeddings, BM25 sparse vectors, RRF fusion, FlashRank cross-encoder.
+- 🔁 **Bounded self-correction** — the grader can reject context and trigger at most two rewrites.
+- 🛡️ **Guardrails first** — NeMo Guardrails blocks off-topic, jailbreak and greeting traffic before any spend.
+- 📊 **Telemetry on every answer** — grade, confidence, retry count, retrieval error and the full plan.
+- ⚡ **Resilient synthesis** — Portkey gateway with caching, retries and fallback providers.
+- 🧪 **Two independent judges** — RAGAS and DeepEval gates in CI, plus 16 offline unit tests.
+- 🖥️ **React client** — reasoning timeline, source chunks, latency and rewrite chips, live backend status.
 
 ---
 
-## Ingestion pipeline
-
-![Ingestion pipeline](docs/diagrams/ingestion-pipeline.png)
-
-<sub>PNG preview · [vector SVG](docs/diagrams/ingestion-pipeline.svg) · [interactive HTML](.archify/dataflow-ingestion-pipeline-20261028-023107/ingestion-pipeline.dataflow.html)</sub>
-
-Documents are parsed locally (pypdf, BeautifulSoup, python-pptx/docx), split into ~1500-character paragraph chunks, encoded both densely (`all-mpnet-base-v2`) and sparsely (`Qdrant/bm25` via fastembed), and written to Qdrant in one upsert per file. Chunk metadata is also archived to `processed_data/<domain>/` as JSON, so the corpus is inspectable without touching the vector database.
+## Quick start
 
 ```bash
-# wipe + rebuild the hybrid collection from a corpus folder
+# 1. Clone
+git clone https://github.com/Anshika102005/Enterprise-Grade-RAG-Application.git
+cd Enterprise-Grade-RAG-Application
+
+# 2. Install
+python -m venv .venv && source .venv/Scripts/activate    # Windows
+# source .venv/bin/activate                              # macOS / Linux
+pip install -r requirement.txt
+
+# 3. Configure — create .env with the keys from the Configuration table
+#    Minimum: QDRANT_CLUSTER_ENDPOINT, QDRANT_API_KEY, GROQ_API_KEY, PORTKEY_API_KEY
+
+# 4. Ingest a corpus (first run creates the hybrid collection)
 python -m app.Ingestion.processor data/true_data --wipe
+
+# 5. Run the API
+uvicorn app.main:app --reload --port 8000                 # Swagger at /docs
+
+# 6. Run the UI
+cd frontend && npm install && npm run dev                 # http://localhost:5173
+```
+
+The dev server proxies `/api/*` to `http://localhost:8000`, so there is no CORS friction locally.
+
+---
+
+## Installation
+
+### Prerequisites
+
+| Tool | Version | Notes |
+|---|---|---|
+| Python | 3.12+ | virtualenv recommended |
+| Node.js | 20+ | only for the React client |
+| Qdrant | Cloud cluster or local | named dense + sparse vectors required |
+| Groq API key | — | planner, grader, rewriter, responder |
+| Portkey API key | — | synthesis gateway |
+| Google Chrome | any recent | optional, only for diagram re-export |
+
+The embedding and reranking models (`all-mpnet-base-v2`, FlashRank MiniLM) run on CPU and are downloaded on first use; no GPU is required.
+
+### Manual setup
+
+```bash
+python -m venv .venv
+source .venv/Scripts/activate        # Windows
+# source .venv/bin/activate          # macOS / Linux
+pip install -r requirement.txt
+# create .env in the project root with the variables listed below
+```
+
+---
+
+## Configuration
+
+All settings are read from `.env` through `app/config.py`.
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `QDRANT_CLUSTER_ENDPOINT` | ✅ | Qdrant Cloud cluster URL |
+| `QDRANT_API_KEY` | ✅ | Qdrant API key |
+| `GROQ_API_KEY` | ✅ | planner / grader / rewriter model calls |
+| `PORTKEY_API_KEY` | ✅ | synthesis gateway (fallback, cache, retries) |
+| `GROQ_FALLBACK_API_KEY` | – | secondary provider key for the gateway |
+| `JUDGE_GROQ` | – | dedicated eval budget; falls back to `GROQ_API_KEY` |
+| `LOGFIRE_TOKEN` | – | span export to Logfire |
+| `LANGSMITH_API_KEY` | – | LangGraph tracing |
+| `HUGGINGFACE_EMBEDDING_MODEL` | – | override the dense encoder |
+| `CORS_ORIGINS` | – | comma-separated allowed origins for the SPA |
+
+Never commit `.env`; it is excluded by `.gitignore`.
+
+---
+
+## API
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/` | service banner and index info |
+| `GET` | `/graph` | Mermaid/JSON view of the agent graph |
+| `POST` | `/query` | run the agent for a question and `thread_id` |
+| `GET` | `/docs` | interactive OpenAPI documentation |
+
+`POST /query`
+
+```json
+{ "q": "What is a database? Types and use cases for relational and NoSQL systems.",
+  "thread_id": "user-42" }
+```
+
+```json
+{
+  "answer": "…",
+  "thought_process": ["Intent: Technical", "Search Term: …", "Context Retrieved (attempt 1)",
+                      "Grade: relevant (2 passages, conf 0.80)"],
+  "status": "Response generated.",
+  "sources": ["CONTENT: # NoSQL databases …", "CONTENT: # relational database fundamentals …"],
+  "retrieval_grade": "relevant",
+  "retrieval_confidence": 0.8,
+  "retrieval_retries": 0,
+  "retrieval_error": null
+}
+```
+
+Telemetry is first-class: `retrieval_grade` (`relevant` · `irrelevant` · `unavailable`), `retrieval_confidence`, `retrieval_retries`, and `retrieval_error` — non-null only when the vector store itself was unreachable. The UI renders that as a distinct *"Retrieval unavailable"* state, so an infrastructure failure is never presented as a relevance verdict.
+
+```bash
+curl -s http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"q":"Explain reciprocal rank fusion","thread_id":"demo"}'
 ```
 
 ---
@@ -116,97 +284,6 @@ Dense encoder `sentence-transformers/all-mpnet-base-v2` (768-d, cosine) · spars
 
 ---
 
-## Repository layout
-
-```
-app/
-├── main.py                     FastAPI app: guardrails gate → LangGraph → response payload
-├── config.py                   settings, retrieval tunables, gateway/eval keys
-├── agents/
-│   ├── graph.py                5-node StateGraph, checkpointed per thread_id
-│   ├── state.py                AgentState (documents, plan, grade, confidence, retrieval_error)
-│   └── nodes/                  planner · retriever · grader · rewriter · responder
-├── services/Retrieval/
-│   ├── qdrant_service.py       hybrid search, RRF fusion, legacy fallback, outage signalling
-│   ├── embeddings.py           all-mpnet-base-v2 (768-d)
-│   ├── ranking_service.py      FlashRank cross-encoder reranking
-│   └── fusion.py · schema.py   RRF + named-vector contract
-├── Ingestion/                  loaders (pdf/html/text/office) · chunker · processor CLI
-└── guardrails/                 Colang intents/flows + LLMRails wiring
-evals/                          RAGAS + DeepEval runners, golden dataset, thresholds
-frontend/                       React UI (see frontend/README.md)
-tests/                          offline unit tests (RRF fusion, grader parsing)
-docs/diagrams/                  diagram assets used by this README
-.archify/                       diagram sources (JSON) and explorable HTML exports
-```
-
----
-
-## Quickstart
-
-```bash
-# 1. Install
-python -m venv .venv && source .venv/Scripts/activate    # Windows: .venv\Scripts\activate
-pip install -r requirement.txt
-
-# 2. Configure — create .env and fill in the keys from the table below
-
-# 3. Ingest a corpus (first run creates the hybrid collection)
-python -m app.Ingestion.processor data/true_data --wipe
-
-# 4. Run the API
-uvicorn app.main:app --reload --port 8000                 # docs at /docs
-
-# 5. Run the UI
-cd frontend && npm install && npm run dev                 # http://localhost:5173
-```
-
-The dev server proxies `/api/*` to `http://localhost:8000`, so there is no CORS friction locally.
-
-### Configuration
-
-| Variable | Required | Purpose |
-|---|---|---|
-| `QDRANT_CLUSTER_ENDPOINT` | ✅ | Qdrant Cloud cluster URL |
-| `QDRANT_API_KEY` | ✅ | Qdrant API key |
-| `GROQ_API_KEY` | ✅ | planner / grader / rewriter model calls |
-| `PORTKEY_API_KEY` | ✅ | synthesis gateway (fallback, cache, retries) |
-| `GROQ_FALLBACK_API_KEY` | – | secondary provider key for the gateway |
-| `JUDGE_GROQ` | – | dedicated eval budget; falls back to `GROQ_API_KEY` |
-| `LOGFIRE_TOKEN` | – | span export to Logfire |
-| `LANGSMITH_API_KEY` | – | LangGraph tracing |
-| `HUGGINGFACE_EMBEDDING_MODEL` | – | override the dense encoder |
-| `CORS_ORIGINS` | – | comma-separated allowed origins for the SPA |
-
----
-
-## API
-
-`POST /query`
-
-```json
-{ "q": "What is a database? Types and use cases for relational and NoSQL systems.",
-  "thread_id": "user-42" }
-```
-
-```json
-{
-  "answer": "…",
-  "thought_process": ["Intent: Technical", "Search Term: …", "Context Retrieved (attempt 1)",
-                      "Grade: relevant (2 passages, conf 0.80)"],
-  "status": "Response generated.",
-  "sources": ["CONTENT: # NoSQL databases …", "CONTENT: # relational database fundamentals …"],
-  "retrieval_grade": "relevant",
-  "retrieval_confidence": 0.8,
-  "retrieval_retries": 0,
-  "retrieval_error": null
-}
-```
-
-Telemetry is first-class: `retrieval_grade` (`relevant` · `irrelevant` · `unavailable`), `retrieval_confidence`, `retrieval_retries`, and `retrieval_error` — non-null only when the vector store itself was unreachable. The UI renders that as a distinct *"Retrieval unavailable"* state, so an infrastructure failure is never presented as a relevance verdict.
-
----
-
 ## Evaluation & CI
 
 Two independent judges over the same pipeline, so scores are not one vendor's opinion:
@@ -228,9 +305,49 @@ pytest -q                                                           # 16 offline
 
 ---
 
-## UI
+## Repository layout
 
-The React client ([`frontend/README.md`](frontend/README.md)) renders streamed-feel answers, the agent's plan steps, every retrieved chunk with its source, and the Self-RAG telemetry chips (context verified / low relevance, grader confidence, rewrite count, latency) — with a live backend status dot and `localStorage`-persisted conversation memory keyed to `thread_id`.
+```
+app/
+├── main.py                     FastAPI app: guardrails gate → LangGraph → response payload
+├── config.py                   settings, retrieval tunables, gateway/eval keys
+├── agents/
+│   ├── graph.py                5-node StateGraph, checkpointed per thread_id
+│   ├── state.py                AgentState (documents, plan, grade, confidence, retrieval_error)
+│   └── nodes/                  planner · retriever · grader · rewriter · responder
+├── services/Retrieval/
+│   ├── qdrant_service.py       hybrid search, RRF fusion, legacy fallback, outage signalling
+│   ├── embeddings.py           all-mpnet-base-v2 (768-d)
+│   ├── ranking_service.py      FlashRank cross-encoder reranking
+│   └── fusion.py · schema.py   RRF + named-vector contract
+├── Ingestion/                  loaders (pdf/html/text/office) · chunker · processor CLI
+└── guardrails/                 Colang intents/flows + LLMRails wiring
+evals/                          RAGAS + DeepEval runners, golden dataset, thresholds
+frontend/                       React UI (see frontend/README.md)
+tests/                          offline unit tests (RRF fusion, grader parsing)
+docs/diagrams/                  SVG sources and 2× PNG previews used by this README
+.archify/                       archify build workspace (git-ignored): specs + interactive HTML
+```
+
+---
+
+## Diagram generation
+
+Every diagram above is generated from a typed JSON specification with the [archify](https://github.com/tt-a1i/archify) skill — no hand-drawn boxes. They share a single dark technical palette (`#020617` canvas, teal processing, violet storage, blue external services, amber boundaries, `#8B5CF6` agent accents) defined once in `_diagram_theme.py`, so every export stays consistent.
+
+| Diagram | Type | Build folder |
+|---|---|---|
+| System architecture | architecture | `.archify/architecture-rag-system-20261028-021934/` |
+| Request lifecycle | sequence | `.archify/sequence-request-lifecycle-20261028-022800/` |
+| Self-RAG corrective loop | workflow | `.archify/workflow-self-rag-loop-20261028-022233/` |
+| Ingestion pipeline | dataflow | `.archify/dataflow-ingestion-pipeline-20261028-023107/` |
+
+```bash
+# re-export all four SVGs and 2× PNGs (requires the .archify workspace + Chrome)
+python _export_diagrams.py
+```
+
+The exporter embeds explicit colours and the bundled font in each SVG, validates it as XML, and renders the PNG from that SVG at 2× — the exported files do not depend on any external stylesheet.
 
 ---
 
@@ -247,13 +364,57 @@ Deliberately documented rather than hidden:
 
 ---
 
-## Diagram provenance
+## Roadmap
 
-Every diagram in this README is generated from a typed JSON specification with the [archify](https://github.com/tt-a1i/archify) skill and passed its validation, delivery, provenance and headless-browser gates — no hand-drawn boxes. Sources and explorable HTML exports are committed under `.archify/`; the vector SVGs and their 2× PNG previews live in `docs/diagrams/` (the PNGs embedded above are headless-Chrome renders of those SVGs).
+- [x] Hybrid retrieval with RRF fusion and cross-encoder reranking
+- [x] Self-RAG grading with a bounded rewrite loop
+- [x] Guardrails gate and Portkey failover
+- [x] React client with reasoning timeline and telemetry
+- [x] RAGAS + DeepEval gates in CI
+- [ ] Broaden Colang intents to all 13 corpus domains
+- [ ] Idempotent ingestion via content hashing
+- [ ] `source_type` payload index
+- [ ] Docker Compose for API + UI
+- [ ] Public demo and UI screenshots
 
-| Diagram | Type | Source |
-|---|---|---|
-| System architecture | architecture | `.archify/architecture-rag-system-20261028-021934/candidate.json` |
-| Request lifecycle | sequence | `.archify/sequence-request-lifecycle-20261028-022800/candidate.json` |
-| Self-RAG corrective loop | workflow | `.archify/workflow-self-rag-loop-20261028-022233/candidate.json` |
-| Ingestion pipeline | dataflow | `.archify/dataflow-ingestion-pipeline-20261028-023107/candidate.json` |
+---
+
+## Contributing
+
+1. Fork the repository and create a feature branch (`git checkout -b feature/my-change`).
+2. Keep the offline tests green: `pytest -q`.
+3. Re-export diagrams if you change the architecture: `python _export_diagrams.py`.
+4. Open a pull request describing the behaviour changed and how you verified it.
+
+---
+
+## FAQ
+
+**Does this need a GPU?**
+No. Embeddings and reranking run on CPU; only planner/grader/rewriter/synthesis calls leave the machine.
+
+**Can I run it without Qdrant Cloud?**
+Yes — point `QDRANT_CLUSTER_ENDPOINT` at a local Qdrant instance. The collection must support the named dense + sparse vector schema.
+
+**How do I add documents?**
+Drop them in a corpus folder and run `python -m app.Ingestion.processor <folder> --wipe`. Loaders support PDF, HTML, plain text and Office formats.
+
+**Why did my first query take so long?**
+The dense encoder and FlashRank reranker download and warm up on first use.
+
+**Why does the server log show Unicode errors on Windows?**
+Logfire's console exporter cannot write to `cp1252`; run with `PYTHONIOENCODING=utf-8`.
+
+---
+
+## Credits
+
+- Diagrams generated with [archify](https://github.com/tt-a1i/archify).
+- Built on [FastAPI](https://fastapi.tiangolo.com), [LangGraph](https://langchain-ai.github.io/langgraph/), [Qdrant](https://qdrant.tech), [Groq](https://groq.com), [Portkey](https://portkey.ai), [NeMo Guardrails](https://github.com/NVIDIA/NeMo-Guardrails), [RAGAS](https://docs.ragas.io) and [DeepEval](https://docs.confident-ai.com).
+- Frontend built with [React](https://react.dev), [Vite](https://vite.dev) and [Tailwind CSS](https://tailwindcss.com).
+
+---
+
+## License
+
+No license file is currently included in this repository, so all rights are reserved by default. Add a `LICENSE` file (for example MIT or Apache-2.0) before redistributing or accepting external contributions.
