@@ -170,3 +170,4 @@ _receipts/
 # Export scripts are committed for reproducibility (must come after _* pattern)
 !_export_diagrams.py
 !_export_svg.py
+!_diagram_theme.py
